@@ -216,6 +216,23 @@ class Foreman::Engine
     @formation ||= parse_formation(options[:formation])
   end
 
+  # Get the ordered process formation
+  #
+  # @returns [Array]  An array of [process, count] tuples
+  #
+  def ordered_formation
+    pairs = options[:formation].to_s.gsub(/\s/, "").split(",")
+    pairs.inject([]) do |acc, pair|
+      process, amount = pair.split("=")
+      if process == "all"
+        process_names.each { |p| acc << [p, amount.to_i] }
+      else
+        acc << [process, amount.to_i]
+      end
+      acc
+    end
+  end
+
   # List the available process names
   #
   # @returns [Array]  A list of process names
@@ -345,19 +362,21 @@ private
 ## Engine ###########################################################
 
   def spawn_processes
-    @processes.each do |process|
-      1.upto(formation[@names[process]]) do |n|
+    port = base_port
+
+    ordered_formation.each do |process_name, count|
+      process = process(process_name)
+      1.upto(count) do |n|
         reader, writer = create_pipe
         begin
-          pid = process.run(:output => writer, :env => {
-            "PORT" => port_for(process, n).to_s
-          })
+          pid = process.run(:output => writer, :env => {"PORT" => port.to_s})
           writer.puts "started with pid #{pid}"
         rescue Errno::ENOENT
           writer.puts "unknown command: #{process.command}"
         end
         @running[pid] = [process, n]
         @readers[pid] = reader
+        port += 1
       end
     end
   end

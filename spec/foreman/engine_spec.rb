@@ -50,6 +50,26 @@ describe "Foreman::Engine", :fakefs do
       mock(subject).watch_for_termination
       subject.start
     end
+
+    it "runs in formation order" do
+      subject.options[:formation] = "bravo=1,alpha=1"
+      mock(subject.process("bravo")).run(anything).once.ordered
+      mock(subject.process("alpha")).run(anything).once.ordered
+      mock(subject).watch_for_output
+      mock(subject).watch_for_termination
+      subject.start
+    end
+
+    it "assigns ports sequentially based on the formation" do
+      subject.options[:formation] = "bravo=2,alpha=1"
+      subject.options[:port] = "8000"
+      mock(subject.process("bravo")).run(hash_including(:env => {"PORT" => "8000"})).once.ordered
+      mock(subject.process("bravo")).run(hash_including(:env => {"PORT" => "8001"})).once.ordered
+      mock(subject.process("alpha")).run(hash_including(:env => {"PORT" => "8002"})).once.ordered
+      mock(subject).watch_for_output
+      mock(subject).watch_for_termination
+      subject.start
+    end
   end
 
   describe "directories" do
